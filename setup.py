@@ -11,6 +11,7 @@ setup(
     install_requires=[
         'twisted >= 15.5.0',
         'pyopenssl',
+        'treq',
         'txsni',
         'incremental',
     ],
