@@ -15,3 +15,4 @@ htmlcov/
 *.lock
 apidocs/
 *.log
+*.DS_Store
