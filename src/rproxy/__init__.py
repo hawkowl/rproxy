@@ -35,7 +35,7 @@ class RProxyResource(Resource):
                                                   [__version__.package + " " + __version__.base()])
             return b"I can't seem to find a domain by that name. Look behind the couch?"
 
-        if self._letsEncryptPath and request.isSecure() and request.path == "/.well-known/acme-challenge":
+        if self._letsEncryptPath  and request.path == "/.well-known/acme-challenge":
             request.responseHeaders.setRawHeaders("Server",
                                                   [__version__.package + " " + __version__.base()])
             try:
@@ -126,6 +126,14 @@ def makeService(config):
         hosts[i]["onlysecure"] = True if hosts[i]["onlysecure"]=="True" else False
         hosts[i]["proxysecure"] = True if hosts[i]["proxysecure"]=="True" else False
 
+        if hosts[i]["onlysecure"] and not hosts[i]["proxysecure"]:
+            if not hosts[i].get("iamokwithalocalnetworkattackerpwningmyusers", "False") == "True":
+                raise ValueError("%s has onlysecure==True, but proxysecure==False. This will mean TLS protected requests will not be TLS-protected between the proxy and the proxied server. If this is okay (e.g., if it's going over localhost), set %s_iamokwithalocalnetworkattackerpwningmyusers=True in your config." % (i, i))
+
+        if hosts[i]["proxysecure"] and not hosts[i]["onlysecure"]:
+            if not hosts[i].get("iamokwithlyingtomyproxiedserverthatheuserisoverhttps", "False") == "True":
+                raise ValueError("%s has onlysecure==False, but proxysecure==True. This means that the connection may not be TLS protected between the user and this proxy, only the proxy and the proxied server. This can trick your proxied server into thinking the user is being served over HTTPS. If this is okay (I can't imagine why it is), set %s_iamokwithlyingtomyproxiedserverthatheuserisoverhttps=True in your config." % (i, i))
+
     if rproxyConf.get("letsencrypt"):
         letsEncryptPath = FilePath(rproxyConf.get("letsencrypt"))
     else:
@@ -137,13 +145,13 @@ def makeService(config):
 
     multiService = service.MultiService()
 
-    SNI = rproxyConf.get("sni", None)
+    certificates = rproxyConf.get("certificates", None)
 
-    if SNI:
-        SNI = FilePath(SNI).path
+    if certificates:
+        certificates = FilePath(certificates).path
         for i in rproxyConf.get("https_ports").split(","):
             print("Starting HTTPS on port " + i)
-            multiService.addService(strports.service('txsni:' + SNI + ':tcp:' + i, site))
+            multiService.addService(strports.service('txsni:' + certificates + ':tcp:' + i, site))
 
     for i in rproxyConf.get("http_ports", "").split(","):
         print("Starting HTTP on port " + i)
