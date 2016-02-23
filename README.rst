@@ -73,3 +73,4 @@ Hosts Config
 - ``<host>_port`` -- The port of the proxied server that this proxy should connect to.
 - ``<host>_host`` -- the hostname/IP of the server to proxy to.
 - ``<host>_sendhsts`` -- send HSTS headers on HTTPS connections.
+- ``<host>_wwwtoo`` -- match ``www`` too. (Note: if you are using TLS, you will need a ``www.<host>.pem`` in your certificates directory too!)

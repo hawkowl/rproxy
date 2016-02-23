@@ -29,6 +29,13 @@ class RProxyResource(Resource):
 
         host = self._hosts.get(request.getRequestHostname().lower())
 
+        if not host and request.getRequestHostname().lower().startswith("www."):
+            host = self._hosts.get(request.getRequestHostname().lower()[4:])
+
+            # The non-www host doesn't want to match to www.
+            if not host["wwwtoo"]:
+                host = None
+
         if not host:
             request.code = 404
             request.responseHeaders.setRawHeaders("Server",
@@ -127,6 +134,10 @@ def makeService(config):
             print("%s does not have an onlysecure setting, making False" % (i,))
             hosts[i]["onlysecure"] = False
 
+        if "wwwtoo" not in hosts[i]:
+            print("%s does not have an wwwtoo setting, making True" % (i,))
+            hosts[i]["wwwtoo"] = True
+
         if "proxysecure" not in hosts[i]:
             print("%s does not have an proxysecure setting, making False" % (i,))
             hosts[i]["proxysecure"] = False
@@ -138,6 +149,7 @@ def makeService(config):
         hosts[i]["onlysecure"] = True if hosts[i]["onlysecure"]=="True" else False
         hosts[i]["proxysecure"] = True if hosts[i]["proxysecure"]=="True" else False
         hosts[i]["sendhsts"] = True if hosts[i]["sendhsts"]=="True" else False
+        hosts[i]["wwwtoo"] = True if hosts[i]["wwwtoo"]=="True" else False
 
         if hosts[i]["onlysecure"] and not hosts[i]["proxysecure"]:
             if not hosts[i].get("iamokwithalocalnetworkattackerpwningmyusers", "False") == "True":
