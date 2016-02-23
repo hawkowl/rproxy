@@ -88,6 +88,8 @@ def makeService(config):
     ini = ConfigParser.RawConfigParser()
     ini.read(config['config'])
 
+    configPath = FilePath(config['config']).parent()
+
     rproxyConf = dict(ini.items("rproxy"))
     hostsConf = dict(ini.items("hosts"))
 
@@ -135,7 +137,7 @@ def makeService(config):
                 raise ValueError("%s has onlysecure==False, but proxysecure==True. This means that the connection may not be TLS protected between the user and this proxy, only the proxy and the proxied server. This can trick your proxied server into thinking the user is being served over HTTPS. If this is okay (I can't imagine why it is), set %s_iamokwithlyingtomyproxiedserverthatheuserisoverhttps=True in your config." % (i, i))
 
     if rproxyConf.get("letsencrypt"):
-        letsEncryptPath = FilePath(rproxyConf.get("letsencrypt"))
+        letsEncryptPath = configPath.child(rproxyConf.get("letsencrypt"))
     else:
         letsEncryptPath = None
 
@@ -148,7 +150,7 @@ def makeService(config):
     certificates = rproxyConf.get("certificates", None)
 
     if certificates:
-        certificates = FilePath(certificates).path
+        certificates = configPath.child(certificates).path
         for i in rproxyConf.get("https_ports").split(","):
             print("Starting HTTPS on port " + i)
             multiService.addService(strports.service('txsni:' + certificates + ':tcp:' + i, site))
