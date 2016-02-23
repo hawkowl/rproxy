@@ -136,7 +136,7 @@ def makeService(config):
 
         if "wwwtoo" not in hosts[i]:
             print("%s does not have an wwwtoo setting, making True" % (i,))
-            hosts[i]["wwwtoo"] = True
+            hosts[i]["wwwtoo"] = "True"
 
         if "proxysecure" not in hosts[i]:
             print("%s does not have an proxysecure setting, making False" % (i,))
