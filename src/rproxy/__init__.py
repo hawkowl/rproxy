@@ -35,11 +35,13 @@ class RProxyResource(Resource):
                                                   [__version__.package + " " + __version__.base()])
             return b"I can't seem to find a domain by that name. Look behind the couch?"
 
-        if self._letsEncryptPath  and request.path == "/.well-known/acme-challenge":
+        if self._letsEncryptPath  and request.path.startswith("/.well-known/acme-challenge/"):
             request.responseHeaders.setRawHeaders("Server",
                                                   [__version__.package + " " + __version__.base()])
             try:
-                with self._letsEncryptPath.child(request.getRequestHostname()).child(".well-known").child("acme-challenge").open() as f:
+                bit = request.path.rsplit("/", 1)[1]
+
+                with self._letsEncryptPath.child(request.getRequestHostname()).child(".well-known").child("acme-challenge").child(bit).open() as f:
                     return f.read()
             except:
                 return b""
