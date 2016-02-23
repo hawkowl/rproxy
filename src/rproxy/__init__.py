@@ -66,6 +66,10 @@ class RProxyResource(Resource):
             request.responseHeaders.addRawHeader("X-Proxied-By",
                                                  __version__.package + " " + __version__.base())
 
+            if request.isSecure() and host["sendhsts"]:
+                request.responseHeaders.setRawHeaders("Strict-Transport-Security",
+                                                      ["max-age=31536000"])
+
             if self._clacks:
                 request.responseHeaders.addRawHeader("X-Clacks-Overhead",
                                                      "GNU Terry Pratchett")
@@ -127,8 +131,13 @@ def makeService(config):
             print("%s does not have an proxysecure setting, making False" % (i,))
             hosts[i]["proxysecure"] = False
 
+        if "sendhsts" not in hosts[i]:
+            print("%s does not have an sendhsts setting, making the value of onlysecure" % (i,))
+            hosts[i]["sendhsts"] = hosts[i]["onlysecure"]
+
         hosts[i]["onlysecure"] = True if hosts[i]["onlysecure"]=="True" else False
         hosts[i]["proxysecure"] = True if hosts[i]["proxysecure"]=="True" else False
+        hosts[i]["sendhsts"] = True if hosts[i]["sendhsts"]=="True" else False
 
         if hosts[i]["onlysecure"] and not hosts[i]["proxysecure"]:
             if not hosts[i].get("iamokwithalocalnetworkattackerpwningmyusers", "False") == "True":
