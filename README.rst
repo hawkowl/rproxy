@@ -1,7 +1,10 @@
 rproxy
 ======
 
-A super simple HTTP/1.1 proxy, with TLS support.
+A super simple HTTP/1.1 proxy, with TLS and Let's Encrypt support.
+
+rproxy takes care of your Let's Encrypt certificates, automatically renewing them.
+This is done by the excellent `txacme <https://github.com/mithrandi/txacme>`_ library.
 
 Install from PyPI:
 
@@ -35,7 +38,6 @@ You can configure it further:
 
     [rproxy]
     certs=certificates
-    letsencrypt=le
     http_ports=80,8080
     https_ports=443
     clacks=true
@@ -60,8 +62,7 @@ General Config
 
 - ``http_ports`` -- comma-separated list of numerical ports to listen on for HTTP connections.
 - ``https_ports`` -- comma-separated list of numerical ports to listen on for HTTPS connections.
-- ``certificates`` -- directory where certificates are kept. rproxy looks for ``<host>.pem`` in this folder when serving HTTPS sites.
-- ``letsencrypt`` -- directory where Let's Encrypt ACME challenges are kept -- the "webroot" parameter for https://github.com/kuba/simp_le . rproxy looks for ``<host>/.well-known/acme-challenge`` in this folder when serving Let's Encrypt HTTP-01 challenges.
+- ``certificates`` -- directory where certificates are kept.
 - ``clacks`` -- Enable ``X-Clacks-Overhead`` for requests.
 
 
@@ -73,4 +74,4 @@ Hosts Config
 - ``<host>_port`` -- The port of the proxied server that this proxy should connect to.
 - ``<host>_host`` -- the hostname/IP of the server to proxy to.
 - ``<host>_sendhsts`` -- send HSTS headers on HTTPS connections.
-- ``<host>_wwwtoo`` -- match ``www`` too. (Note: if you are using TLS, you will need a ``www.<host>.pem`` in your certificates directory too!)
+- ``<host>_wwwtoo`` -- match ``www`` too.

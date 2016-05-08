@@ -20,8 +20,7 @@ class RProxyResource(Resource):
 
     isLeaf = True
 
-    def __init__(self, hosts, letsEncryptPath, clacks):
-        self._letsEncryptPath = letsEncryptPath
+    def __init__(self, hosts, clacks):
         self._clacks = clacks
         self._hosts = hosts
 
@@ -148,24 +147,29 @@ def makeService(config):
             if not hosts[i].get("iamokwithlyingtomyproxiedserverthatheuserisoverhttps", "False") == "True":
                 raise ValueError("%s has onlysecure==False, but proxysecure==True. This means that the connection may not be TLS protected between the user and this proxy, only the proxy and the proxied server. This can trick your proxied server into thinking the user is being served over HTTPS. If this is okay (I can't imagine why it is), set %s_iamokwithlyingtomyproxiedserverthatheuserisoverhttps=True in your config." % (i, i))
 
-    resource = RProxyResource(hosts, letsEncryptPath, rproxyConf.get("clacks"))
+    resource = RProxyResource(hosts, rproxyConf.get("clacks"))
 
     site = server.Site(resource)
     multiService = service.MultiService()
     certificates = rproxyConf.get("certificates", None)
 
     if certificates:
+        try:
+            configPath.child(certificates).makedirs()
+        except:
+            pass
+
         certificates = configPath.child(certificates).path
         for i in rproxyConf.get("https_ports").split(","):
             print("Starting HTTPS on port " + i)
             multiService.addService(strports.service('le:' + certificates + ':tcp:' + i, site))
 
         for host in hosts.keys():
-            with open(configPath.child(certificates).child(host).path, 'w'):
+            with open(FilePath(certificates).child(host + ".pem").path, 'w'):
                 # Open it so that txacme can find it
                 pass
             if hosts[host]["wwwtoo"]:
-                with open(configPath.child(certificates).child("www." + host).path, 'w'):
+                with open(FilePath(certificates).child("www." + host + ".pem").path, 'w'):
                     # Open it so that txacme can find it
                     pass
 
