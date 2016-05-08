@@ -42,17 +42,6 @@ class RProxyResource(Resource):
                                                   [__version__.package + " " + __version__.base()])
             return b"I can't seem to find a domain by that name. Look behind the couch?"
 
-        if self._letsEncryptPath  and request.path.startswith("/.well-known/acme-challenge/"):
-            request.responseHeaders.setRawHeaders("Server",
-                                                  [__version__.package + " " + __version__.base()])
-            try:
-                bit = request.path.rsplit("/", 1)[1]
-
-                with self._letsEncryptPath.child(request.getRequestHostname()).child(".well-known").child("acme-challenge").child(bit).open() as f:
-                    return f.read()
-            except:
-                return b""
-
         if host["onlysecure"] and not request.isSecure():
             urlpath = request.URLPath()
             urlpath.scheme = "https"
@@ -159,24 +148,26 @@ def makeService(config):
             if not hosts[i].get("iamokwithlyingtomyproxiedserverthatheuserisoverhttps", "False") == "True":
                 raise ValueError("%s has onlysecure==False, but proxysecure==True. This means that the connection may not be TLS protected between the user and this proxy, only the proxy and the proxied server. This can trick your proxied server into thinking the user is being served over HTTPS. If this is okay (I can't imagine why it is), set %s_iamokwithlyingtomyproxiedserverthatheuserisoverhttps=True in your config." % (i, i))
 
-    if rproxyConf.get("letsencrypt"):
-        letsEncryptPath = configPath.child(rproxyConf.get("letsencrypt"))
-    else:
-        letsEncryptPath = None
-
     resource = RProxyResource(hosts, letsEncryptPath, rproxyConf.get("clacks"))
 
     site = server.Site(resource)
-
     multiService = service.MultiService()
-
     certificates = rproxyConf.get("certificates", None)
 
     if certificates:
         certificates = configPath.child(certificates).path
         for i in rproxyConf.get("https_ports").split(","):
             print("Starting HTTPS on port " + i)
-            multiService.addService(strports.service('txsni:' + certificates + ':tcp:' + i, site))
+            multiService.addService(strports.service('le:' + certificates + ':tcp:' + i, site))
+
+        for host in hosts.keys():
+            with open(configPath.child(certificates).child(host).path, 'w'):
+                # Open it so that txacme can find it
+                pass
+            if hosts[host]["wwwtoo"]:
+                with open(configPath.child(certificates).child("www." + host).path, 'w'):
+                    # Open it so that txacme can find it
+                    pass
 
     for i in rproxyConf.get("http_ports", "").split(","):
         print("Starting HTTP on port " + i)
