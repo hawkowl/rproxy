@@ -51,7 +51,7 @@ class RProxyResource(Resource):
             "https" if host["proxysecure"] else "http",
             host["host"], host["port"], request.path[1:])
 
-        d = treq.request(request.method, url,
+        d = treq.request(request.method, url, params=request.args,
                          headers=request.requestHeaders, data=request.content.getvalue())
 
         def write(res):
