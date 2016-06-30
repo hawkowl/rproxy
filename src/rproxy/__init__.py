@@ -52,7 +52,8 @@ class RProxyResource(Resource):
             host["host"], host["port"], request.path[1:])
 
         d = treq.request(request.method, url, params=request.args,
-                         headers=request.requestHeaders, data=request.content.getvalue())
+                         headers=request.requestHeaders,
+                         data=request.content.getvalue(), allow_redirects=False)
 
         def write(res):
 
