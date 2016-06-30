@@ -2,27 +2,66 @@
 
 from __future__ import absolute_import, division
 
-import treq
 import ConfigParser
 
-from twisted.web import server
-from twisted.python import usage
-from twisted.application.service import Service
-from twisted.web.resource import Resource
-from twisted.python.filepath import FilePath
+from zope.interface import implementer
+
+from urllib import urlencode
+
 from twisted.application import service, strports
+from twisted.application.service import Service
+from twisted.internet import reactor
+from twisted.internet.defer import Deferred, succeed
+from twisted.internet.protocol import Protocol
+from twisted.python import usage
+from twisted.python.filepath import FilePath
+from twisted.web import server
+from twisted.web.client import Agent, HTTPConnectionPool
+from twisted.web.iweb import IBodyProducer
+from twisted.web.resource import Resource
 
 from ._version import __version__
 
+
+
+class Downloader(Protocol):
+    def __init__(self, finished, write):
+        self.finished = finished
+        self._write = write
+
+    def dataReceived(self, bytes):
+        self._write(bytes)
+
+    def connectionLost(self, reason):
+        self.finished.callback(None)
+
+
+@implementer(IBodyProducer)
+class StringProducer(object):
+
+    def __init__(self, body):
+        self.body = body.read()
+        self.length = len(self.body)
+
+    def startProducing(self, consumer):
+        consumer.write(self.body)
+        return succeed(None)
+
+    def pauseProducing(self):
+        pass
+
+    def stopProducing(self):
+        pass
 
 
 class RProxyResource(Resource):
 
     isLeaf = True
 
-    def __init__(self, hosts, clacks):
+    def __init__(self, hosts, clacks, pool, reactor):
         self._clacks = clacks
         self._hosts = hosts
+        self._agent = Agent(reactor, pool=pool)
 
     def render(self, request):
 
@@ -51,9 +90,23 @@ class RProxyResource(Resource):
             "https" if host["proxysecure"] else "http",
             host["host"], host["port"], request.path[1:])
 
-        d = treq.request(request.method, url, params=request.args,
-                         headers=request.requestHeaders,
-                         data=request.content.getvalue(), allow_redirects=False)
+        if request.args:
+            args = []
+            for k, x in request.args.iteritems():
+                for y in x:
+                    args.append((k, y))
+
+            url += "?" + urlencode(args)
+
+        for x in [b'content-length', b'connection', b'keep-alive', b'te',
+            b'trailers', b'transfer-encoding', b'upgrade',
+            b'proxy-connection']:
+            request.requestHeaders.removeHeader(x)
+
+        prod = StringProducer(request.content)
+
+        d = self._agent.request(request.method, url,
+                               request.requestHeaders, prod)
 
         def write(res):
 
@@ -70,11 +123,18 @@ class RProxyResource(Resource):
                 request.responseHeaders.addRawHeader("X-Clacks-Overhead",
                                                      "GNU Terry Pratchett")
 
-            g = treq.collect(res, request.write)
-            g.addCallback(lambda _: request.finish())
-            return g
+            f = Deferred()
+            res.deliverBody(Downloader(f, request.write))
+            f.addCallback(lambda _: request.finish())
+            return f
+
+        def failed(res):
+            request.code = 500
+            request.write(str(res))
+            request.finish()
 
         d.addCallback(write)
+        d.addErrback(failed)
 
         return server.NOT_DONE_YET
 
@@ -148,7 +208,10 @@ def makeService(config):
             if not hosts[i].get("iamokwithlyingtomyproxiedserverthatheuserisoverhttps", "False") == "True":
                 raise ValueError("%s has onlysecure==False, but proxysecure==True. This means that the connection may not be TLS protected between the user and this proxy, only the proxy and the proxied server. This can trick your proxied server into thinking the user is being served over HTTPS. If this is okay (I can't imagine why it is), set %s_iamokwithlyingtomyproxiedserverthatheuserisoverhttps=True in your config." % (i, i))
 
-    resource = RProxyResource(hosts, rproxyConf.get("clacks"))
+    from twisted.internet import reactor
+    pool = HTTPConnectionPool(reactor)
+
+    resource = RProxyResource(hosts, rproxyConf.get("clacks"), pool, reactor)
 
     site = server.Site(resource)
     multiService = service.MultiService()
