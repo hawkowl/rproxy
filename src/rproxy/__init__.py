@@ -7,6 +7,7 @@ import ConfigParser
 from zope.interface import implementer
 
 from urllib import urlencode
+from urlparse import urlparse
 
 from twisted.application import service, strports
 from twisted.application.service import Service
@@ -90,13 +91,10 @@ class RProxyResource(Resource):
             "https" if host["proxysecure"] else "http",
             host["host"], host["port"], request.path[1:])
 
-        if request.args:
-            args = []
-            for k, x in request.args.iteritems():
-                for y in x:
-                    args.append((k, y))
+        urlFragments = urlparse(request.uri)
 
-            url += "?" + urlencode(args)
+        if urlFragments.query:
+            url += "?" + urlFragments.query
 
         for x in [b'content-length', b'connection', b'keep-alive', b'te',
             b'trailers', b'transfer-encoding', b'upgrade',
@@ -106,7 +104,7 @@ class RProxyResource(Resource):
         prod = StringProducer(request.content)
 
         d = self._agent.request(request.method, url,
-                               request.requestHeaders, prod)
+                                request.requestHeaders, prod)
 
         def write(res):
 
