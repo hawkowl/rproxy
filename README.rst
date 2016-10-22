@@ -23,7 +23,7 @@ Make a ``rproxy.ini``:
 .. code::
 
     [rproxy]
-    certificates=./my-certs
+    certificates=my-certs
     http_ports=80
     https_ports=443
 
