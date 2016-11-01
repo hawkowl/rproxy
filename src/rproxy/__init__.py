@@ -59,10 +59,11 @@ class RProxyResource(Resource):
 
     isLeaf = True
 
-    def __init__(self, hosts, clacks, pool, reactor, anonymous):
+    def __init__(self, hosts, clacks, pool, reactor, extraHeaders, anonymous):
         self._clacks = clacks
         self._hosts = hosts
         self._agent = Agent(reactor, pool=pool)
+        self._extraHeaders = extraHeaders
         self._anonymous = anonymous
 
     def render(self, request):
@@ -123,6 +124,9 @@ class RProxyResource(Resource):
                 request.responseHeaders.addRawHeader("X-Clacks-Overhead",
                                                      "GNU Terry Pratchett")
 
+            for name, values in self._extraHeaders:
+                request.responseHeaders.setRawHeaders(name, values)
+
             f = Deferred()
             res.deliverBody(Downloader(f, request.write))
             f.addCallback(lambda _: request.finish())
@@ -130,6 +134,8 @@ class RProxyResource(Resource):
 
         def failed(res):
             request.code = 500
+            for name, values in self._extraHeaders:
+                request.responseHeaders.setRawHeaders(name, values)
             request.write(str(res))
             request.finish()
 
