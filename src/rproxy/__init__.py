@@ -59,11 +59,12 @@ class RProxyResource(Resource):
 
     isLeaf = True
 
-    def __init__(self, hosts, clacks, pool, reactor, extraHeaders):
+    def __init__(self, hosts, clacks, pool, reactor, extraHeaders, anonymous):
         self._clacks = clacks
         self._hosts = hosts
         self._agent = Agent(reactor, pool=pool)
         self._extraHeaders = extraHeaders
+        self._anonymous = anonymous
 
     def render(self, request):
 
@@ -111,8 +112,9 @@ class RProxyResource(Resource):
 
             request.code = res.code
             request.responseHeaders = res.headers
-            request.responseHeaders.addRawHeader("X-Proxied-By",
-                                                 __version__.package + " " + __version__.base())
+            if not self.anonymous:
+                request.responseHeaders.addRawHeader("X-Proxied-By",
+                                                     __version__.package + " " + __version__.base())
 
             if request.isSecure() and host["sendhsts"]:
                 request.responseHeaders.setRawHeaders("Strict-Transport-Security",
