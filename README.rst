@@ -43,7 +43,7 @@ You can configure it further:
 .. code::
 
     [rproxy]
-    certs=certificates
+    certificates=my-certs
     http_ports=80,8080
     https_ports=443
     clacks=true
