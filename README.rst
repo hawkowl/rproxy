@@ -12,12 +12,18 @@ Install from PyPI:
 
     $ pip install rproxy
 
+Make a directory to store your certificates:
+
+.. code::
+
+    $ mkdir my-certs
+
 Make a ``rproxy.ini``:
 
 .. code::
 
     [rproxy]
-    certs=certificates
+    certificates=my-certs
     http_ports=80
     https_ports=443
 
