@@ -9,7 +9,7 @@ setup(
     packages=['rproxy', 'twisted.plugins'],
     package_dir={"": "src"},
     install_requires=[
-        'twisted >= 15.5.0',
+        'twisted >= 17.1.0',
         'pyopenssl',
         'txsni',
         'incremental',
