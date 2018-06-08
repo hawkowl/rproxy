@@ -16,10 +16,19 @@ from twisted.internet.defer import Deferred, succeed
 from twisted.internet.protocol import Protocol
 from twisted.python import usage
 from twisted.python.filepath import FilePath
-from twisted.web import server, http
+from twisted.web import server, http, static
 from twisted.web.client import Agent, HTTPConnectionPool
 from twisted.web.iweb import IBodyProducer
 from twisted.web.resource import Resource, EncodingResourceWrapper
+
+from josepy.jwa import RS256
+
+from txacme.challenges import HTTP01Responder
+from txacme.client import Client
+from txacme.endpoint import load_or_create_client_key
+from txacme.service import AcmeIssuingService
+from txacme.store import DirectoryStore
+from txacme.urls import LETSENCRYPT_DIRECTORY
 
 from ._version import __version__
 
@@ -55,6 +64,64 @@ class StringProducer(object):
         pass
 
 
+class RespondToHTTP01AndRedirectToHTTPS(Resource):
+    """
+    Allow an L{HTTP01Responder} to handle requests for
+    C{.well_known/acme-challenges} only.  Redirect any other requests
+    to their HTTPS equivalent.
+    """
+    def __init__(self, responderResource):
+        Resource.__init__(self)
+        wellKnown = Resource()
+        wellKnown.putChild(b'acme-challenge', responderResource)
+        self.putChild(b'.well-known', wellKnown)
+        self.putChild(b'check', static.Data(b'OK', b'text/plain'))
+
+    def render(self, request):
+        # request.args can include URL encoded bodies, so extract the
+        # query from request.uri
+        _, _, query = request.uri.partition(b'?')
+        # Assume HTTPS is served over 443
+        httpsURL = URL(
+            scheme=u'https',
+            # I'm sure ASCII will be fine.
+            host=request.getRequestHostname().decode('ascii'),
+            path=tuple(segment.decode('ascii')
+                       for segment in request.prepath + request.postpath),
+
+        )
+        httpsLocation = httpsURL.asText().encode('ascii')
+        if query:
+            httpsLocation += (b'?' + query)
+        return movedTo(request, httpsLocation)
+
+    def getChild(self, path, request):
+        return self
+
+
+class EnsureHTTPS(Resource):
+    """
+    Wrap a resource so that all requests that are not over HTTPS are
+    redirected to HTTPS.
+    """
+    def __init__(self, wrappedResource, responderResource):
+        """
+        Initialize L{EnsureHTTPS}.
+
+        @param wrappedResource: A resource representing the root of a web site.
+        @type wrappedResource: L{twisted.web.resource.Resource}
+        """
+        self._wrappedResource = wrappedResource
+        self._httpResource = RespondToHTTP01AndRedirectToHTTPS(
+                responderResource)
+
+    def getChildWithDefault(self, path, request):
+        if request.isSecure():
+            return self._wrappedResource.getChildWithDefault(path, request)
+        else:
+            return self._httpResource.getChildWithDefault(path, request)
+
+
 class RProxyResource(Resource):
 
     isLeaf = True
@@ -82,12 +149,6 @@ class RProxyResource(Resource):
             request.responseHeaders.setRawHeaders("Server",
                                                   [__version__.package + " " + __version__.base()])
             return b"I can't seem to find a domain by that name. Look behind the couch?"
-
-        if host["onlysecure"] and not request.isSecure():
-            urlpath = request.URLPath()
-            urlpath.scheme = "https"
-            request.redirect(str(urlpath))
-            return b""
 
         url = "{}://{}:{}/{}".format(
             "https" if host["proxysecure"] else "http",
@@ -190,10 +251,6 @@ def makeService(config):
             print("%s does not have a host, making localhost" % (i,))
             hosts[i]["host"] = "localhost"
 
-        if "onlysecure" not in hosts[i]:
-            print("%s does not have an onlysecure setting, making False" % (i,))
-            hosts[i]["onlysecure"] = False
-
         if "wwwtoo" not in hosts[i]:
             print("%s does not have an wwwtoo setting, making True" % (i,))
             hosts[i]["wwwtoo"] = "True"
@@ -202,22 +259,9 @@ def makeService(config):
             print("%s does not have an proxysecure setting, making False" % (i,))
             hosts[i]["proxysecure"] = False
 
-        if "sendhsts" not in hosts[i]:
-            print("%s does not have an sendhsts setting, making the value of onlysecure" % (i,))
-            hosts[i]["sendhsts"] = hosts[i]["onlysecure"]
-
-        hosts[i]["onlysecure"] = True if hosts[i]["onlysecure"]=="True" else False
         hosts[i]["proxysecure"] = True if hosts[i]["proxysecure"]=="True" else False
-        hosts[i]["sendhsts"] = True if hosts[i]["sendhsts"]=="True" else False
-        hosts[i]["wwwtoo"] = True if hosts[i]["wwwtoo"]=="True" else False
+        hosts[i]["sendhsts"] = True if hosts[i].get("sendhsts")=="True" else False
 
-        if hosts[i]["onlysecure"] and not hosts[i]["proxysecure"]:
-            if not hosts[i].get("iamokwithalocalnetworkattackerpwningmyusers", "False") == "True":
-                raise ValueError("%s has onlysecure==True, but proxysecure==False. This will mean TLS protected requests will not be TLS-protected between the proxy and the proxied server. If this is okay (e.g., if it's going over localhost), set %s_iamokwithalocalnetworkattackerpwningmyusers=True in your config." % (i, i))
-
-        if hosts[i]["proxysecure"] and not hosts[i]["onlysecure"]:
-            if not hosts[i].get("iamokwithlyingtomyproxiedserverthatheuserisoverhttps", "False") == "True":
-                raise ValueError("%s has onlysecure==False, but proxysecure==True. This means that the connection may not be TLS protected between the user and this proxy, only the proxy and the proxied server. This can trick your proxied server into thinking the user is being served over HTTPS. If this is okay (I can't imagine why it is), set %s_iamokwithlyingtomyproxiedserverthatheuserisoverhttps=True in your config." % (i, i))
 
     from twisted.internet import reactor
     pool = HTTPConnectionPool(reactor)
@@ -226,7 +270,8 @@ def makeService(config):
         RProxyResource(hosts, rproxyConf.get("clacks"), pool, reactor, {}, False),
         [server.GzipEncoderFactory()])
 
-    site = server.Site(resource)
+    responder = HTTP01Responder()
+    site = server.Site(EnsureHTTPS(resource, responder.resource),)
     multiService = service.MultiService()
     certificates = rproxyConf.get("certificates", None)
 
@@ -239,20 +284,25 @@ def makeService(config):
         certificates = configPath.child(certificates).path
         for i in rproxyConf.get("https_ports").split(","):
             print("Starting HTTPS on port " + i)
-            multiService.addService(strports.service('le:' + certificates + ':tcp:' + i, site))
-
-        for host in hosts.keys():
-            with open(FilePath(certificates).child(host + ".pem").path, 'w'):
-                # Open it so that txacme can find it
-                pass
-            if hosts[host]["wwwtoo"]:
-                with open(FilePath(certificates).child("www." + host + ".pem").path, 'w'):
-                    # Open it so that txacme can find it
-                    pass
+            multiService.addService(strports.service('txsni:' + certificates + ':tcp:' + i, site))
 
     for i in rproxyConf.get("http_ports", "").split(","):
         print("Starting HTTP on port " + i)
         multiService.addService(strports.service('tcp:' + i, site))
+
+    issuingService = AcmeIssuingService(
+        cert_store=DirectoryStore(FilePath(certificates)),
+        client_creator=(lambda: Client.from_url(
+            reactor=reactor,
+            url=LETSENCRYPT_DIRECTORY,
+            key=load_or_create_client_key(FilePath(certificates)),
+            alg=RS256,
+        )),
+        clock=reactor,
+        responders=[responder],
+    )
+
+    issuingService.setServiceParent(multiService)
 
     return multiService
 
