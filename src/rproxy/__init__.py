@@ -9,6 +9,8 @@ from zope.interface import implementer
 from urllib import urlencode
 from urlparse import urlparse
 
+from twisted.python.url import URL
+
 from twisted.application import service, strports
 from twisted.application.service import Service
 from twisted.internet import reactor
@@ -63,6 +65,30 @@ class StringProducer(object):
     def stopProducing(self):
         pass
 
+def movedTo(request, url):
+    """
+    Permanently redirect C{request} to C{url}.
+
+    @param request: The L{twisted.web.server.Reqeuest} to redirect.
+
+    @param url: The new URL to which to redirect the request.
+    @type url: L{bytes}
+
+    @return: The redirect HTML page.
+    @rtype: L{bytes}
+    """
+    request.setResponseCode(http.MOVED_PERMANENTLY)
+    request.setHeader(b"location", url)
+    return ("""
+<html>
+    <head>
+        <meta http-equiv=\"refresh\" content=\"0;URL=%(url)s\">
+    </head>
+    <body bgcolor=\"#FFFFFF\" text=\"#000000\">
+    <a href=\"%(url)s\">click here</a>
+    </body>
+</html>
+""" % {'url': url}).encode('ascii')
 
 class RespondToHTTP01AndRedirectToHTTPS(Resource):
     """
@@ -117,7 +143,7 @@ class EnsureHTTPS(Resource):
 
     def getChildWithDefault(self, path, request):
         if request.isSecure():
-            return self._wrappedResource.getChildWithDefault(path, request)
+            return self._wrappedResource
         else:
             return self._httpResource.getChildWithDefault(path, request)
 
@@ -259,6 +285,7 @@ def makeService(config):
             print("%s does not have an proxysecure setting, making False" % (i,))
             hosts[i]["proxysecure"] = False
 
+        hosts[i]["wwwtoo"] = True if hosts[i]["wwwtoo"]=="True" else False
         hosts[i]["proxysecure"] = True if hosts[i]["proxysecure"]=="True" else False
         hosts[i]["sendhsts"] = True if hosts[i].get("sendhsts")=="True" else False
 
@@ -285,6 +312,15 @@ def makeService(config):
         for i in rproxyConf.get("https_ports").split(","):
             print("Starting HTTPS on port " + i)
             multiService.addService(strports.service('txsni:' + certificates + ':tcp:' + i, site))
+
+        for host in hosts.keys():
+            with open(FilePath(certificates).child(host + ".pem").path, 'w'):
+                # Open it so that txacme can find it
+                pass
+            if hosts[host]["wwwtoo"]:
+                with open(FilePath(certificates).child("www." + host + ".pem").path, 'w'):
+                    # Open it so that txacme can find it
+                    pass
 
     for i in rproxyConf.get("http_ports", "").split(","):
         print("Starting HTTP on port " + i)
