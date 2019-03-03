@@ -6,8 +6,7 @@ from six.moves import configparser
 
 from zope.interface import implementer
 
-from six.moves.urllib.parse import urlencode
-import six.moves.urllib.parse as urlparse
+from six.moves.urllib.parse import urlencode, urlparse
 
 from twisted.python.url import URL
 
