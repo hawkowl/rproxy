@@ -19,7 +19,7 @@ from twisted.internet.protocol import Protocol
 from twisted.python import usage
 from twisted.python.filepath import FilePath
 from twisted.web import server, http, static
-from twisted.web.client import Agent, HTTPConnectionPool
+from twisted.web.client import Agent, HTTPConnectionPool, ContentDecoderAgent, GzipDecoder
 from twisted.web.iweb import IBodyProducer
 from twisted.web.resource import Resource, EncodingResourceWrapper
 
@@ -155,7 +155,7 @@ class RProxyResource(Resource):
     def __init__(self, hosts, clacks, pool, reactor, extraHeaders, anonymous):
         self._clacks = clacks
         self._hosts = hosts
-        self._agent = Agent(reactor, pool=pool)
+        self._agent = ContentDecoderAgent(Agent(reactor, pool=pool), [('gzip', GzipDecoder)])
         self._extraHeaders = extraHeaders
         self._anonymous = anonymous
 
