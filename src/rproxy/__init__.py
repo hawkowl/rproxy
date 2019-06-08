@@ -2,12 +2,11 @@
 
 from __future__ import absolute_import, division
 
-import ConfigParser
+from six.moves import configparser
 
 from zope.interface import implementer
 
-from urllib import urlencode
-from urlparse import urlparse
+from six.moves.urllib.parse import urlencode, urlparse
 
 from twisted.python.url import URL
 
@@ -245,7 +244,7 @@ class Options(usage.Options):
 
 def makeService(config):
 
-    ini = ConfigParser.RawConfigParser()
+    ini = configparser.RawConfigParser()
     ini.read(config['config'])
 
     configPath = FilePath(config['config']).parent()
