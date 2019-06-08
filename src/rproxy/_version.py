@@ -7,5 +7,5 @@ Provides rproxy version information.
 
 from incremental import Version
 
-__version__ = Version('rproxy', 18, 6, 0)
+__version__ = Version('rproxy', 19, 6, 0)
 __all__ = ["__version__"]
