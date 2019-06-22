@@ -1,4 +1,4 @@
-FROM python:3.7
+FROM python:2.7
 
 ADD dist/ /dist
 RUN pip install --no-cache-dir dist/*.whl

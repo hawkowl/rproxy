@@ -101,7 +101,7 @@ class RespondToHTTP01AndRedirectToHTTPS(Resource):
         wellKnown = Resource()
         wellKnown.putChild(b'acme-challenge', responderResource)
         self.putChild(b'.well-known', wellKnown)
-        self.putChild(b'check', static.Data(b'OK', b'text/plain'))
+        self.putChild(b'check', static.Data(b'OK', 'text/plain'))
 
     def render(self, request):
         # request.args can include URL encoded bodies, so extract the
