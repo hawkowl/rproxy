@@ -177,7 +177,7 @@ class RProxyResource(Resource):
 
         url = b"%s://%s:%s/%s" % (
             b"https" if host["proxysecure"] else b"http",
-            host["host"], host["port"], request.path[1:])
+            host["host"].encode('ascii'), host["port"], request.path[1:])
 
         urlFragments = urlparse(request.uri)
 
