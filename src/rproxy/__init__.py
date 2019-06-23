@@ -154,7 +154,7 @@ class RProxyResource(Resource):
     def __init__(self, hosts, clacks, pool, reactor, extraHeaders, anonymous):
         self._clacks = clacks
         self._hosts = hosts
-        self._agent = ContentDecoderAgent(Agent(reactor, pool=pool), [('gzip', GzipDecoder)])
+        self._agent = ContentDecoderAgent(Agent(reactor, pool=pool), [(b'gzip', GzipDecoder)])
         self._extraHeaders = extraHeaders
         self._anonymous = anonymous
 
