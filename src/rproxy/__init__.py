@@ -162,7 +162,7 @@ class RProxyResource(Resource):
 
         host = self._hosts.get(request.getRequestHostname().lower())
 
-        if not host and request.getRequestHostname().lower().startswith("www."):
+        if not host and request.getRequestHostname().lower().startswith(b"www."):
             host = self._hosts.get(request.getRequestHostname().lower()[4:])
 
             # The non-www host doesn't want to match to www.
@@ -175,14 +175,14 @@ class RProxyResource(Resource):
                                                   [__version__.package + " " + __version__.base()])
             return b"I can't seem to find a domain by that name. Look behind the couch?"
 
-        url = "{}://{}:{}/{}".format(
-            "https" if host["proxysecure"] else "http",
+        url = b"%s://%s:%s/%s" % (
+            b"https" if host["proxysecure"] else b"http",
             host["host"], host["port"], request.path[1:])
 
         urlFragments = urlparse(request.uri)
 
         if urlFragments.query:
-            url += "?" + urlFragments.query
+            url += b"?" + urlFragments.query
 
         for x in [b'content-length', b'connection', b'keep-alive', b'te',
             b'trailers', b'transfer-encoding', b'upgrade',
