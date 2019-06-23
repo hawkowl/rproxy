@@ -160,7 +160,7 @@ class RProxyResource(Resource):
 
     def render(self, request):
 
-        host = self._hosts.get(request.getRequestHostname().lower())
+        host = self._hosts.get(request.getRequestHostname().lower().decode('ascii'))
 
         if not host and request.getRequestHostname().lower().startswith(b"www."):
             host = self._hosts.get(request.getRequestHostname().lower()[4:].decode('ascii'))
