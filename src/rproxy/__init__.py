@@ -163,7 +163,7 @@ class RProxyResource(Resource):
         host = self._hosts.get(request.getRequestHostname().lower())
 
         if not host and request.getRequestHostname().lower().startswith(b"www."):
-            host = self._hosts.get(request.getRequestHostname().lower()[4:])
+            host = self._hosts.get(request.getRequestHostname().lower()[4:].decode('ascii'))
 
             # The non-www host doesn't want to match to www.
             if not host["wwwtoo"]:
