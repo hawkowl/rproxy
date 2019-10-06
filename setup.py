@@ -10,7 +10,7 @@ setup(
     package_dir={"": "src"},
     install_requires=[
         'twisted[tls] >= 18.4.0',
-        'attrs =< 19.1',
+        'attrs <= 19.1',
         'pyopenssl',
         'txsni',
         'txacme',
